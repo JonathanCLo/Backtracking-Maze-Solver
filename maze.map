@@ -1,0 +1,130 @@
+Load map
+========
+
+Module:  maze.obj
+ Text segment:  428 bytes, load point 0x00400000
+ Data segment:  13208 bytes, load point 0x10000000
+ Symbols:
+                 Name Section Mode    Value
+             read_int   Text   R   0x004000b0
+          read_string   Text   R   0x004000cc
+              ra_loop   Text   R   0x00400170
+          ra_loop_end   Text   R   0x00400188
+            print_int   Text   RG  0x004000e8
+            max_width   Data   RG  0x10000004
+             READ_INT          A   0x00000005
+         two_newlines   Data   R   0x1000337a
+              newline   Data   R   0x10003378
+        solution_maze   Data   R   0x1000338b
+          read_inputs   Text   R   0x00400120
+           print_maze   Text   R   0x00400030
+           maze_array   Data   RG  0x10000008
+         PRINT_STRING          A   0x00000004
+         print_string   Text   RG  0x00400104
+              ra_done   Text   R   0x00400190
+                 main   Text   RG  0x00400000
+     read_inputs_done   Text   R   0x00400190
+               banner   Data   R   0x10003348
+        print_banners   Text   R   0x00400014
+           print_done   Text   R   0x0040007c
+           max_height   Data   RG  0x10000000
+           str_buffer   Data   R   0x100019a8
+            main_done   Text   R   0x00400098
+          print_input   Text   R   0x00400064
+           read_array   Text   R   0x0040016c
+           input_maze   Data   R   0x1000337d
+                 EXIT          A   0x0000000a
+          READ_STRING          A   0x00000008
+            PRINT_INT          A   0x00000001
+                 read   Text   R   0x0040002c
+
+Module:  algorithm.obj
+ Text segment:  2492 bytes, load point 0x004001ac
+ Data segment:  6640 bytes, load point 0x10003398
+ Symbols:
+                 Name Section Mode    Value
+                 LEFT          A   0x00000003
+             turn_max   Text   R   0x00400a70
+               move_e   Text   R   0x004006a4
+               move_n   Text   R   0x0040069c
+               move_s   Text   R   0x004006ac
+               move_w   Text   R   0x004006b4
+                   UP          A   0x00000000
+       print_solution   Text   R   0x00400ae4
+                RIGHT          A   0x00000001
+  turn_clockwise_done   Text   R   0x00400544
+        for_loop_done   Text   R   0x004003ec
+    leave_crumb_north   Text   R   0x004006fc
+         print_s_loop   Text   R   0x00400b0c
+            copy_loop   Text   R   0x00400200
+           step3_cond   Text   R   0x00400a20
+       backtrace_done   Text   R   0x00400634
+    leave_crumb_south   Text   R   0x004007cc
+          create_copy   Text   R   0x004001ac
+               curr_x   Data   R   0x10003398
+      look_ahead_done   Text   R   0x004004d8
+               curr_y   Data   R   0x1000339c
+      backtrack_north   Text   R   0x004005ec
+           turn_count   Data   R   0x100033a4
+            algorithm   Text   RG  0x00400974
+              get_pos   Text   R   0x0040023c
+      backtrack_south   Text   R   0x00400604
+        copy_loop_end   Text   R   0x0040020c
+          follow_east   Text   R   0x004008e8
+          follow_west   Text   R   0x00400930
+             for_loop   Text   R   0x00400388
+                found   Text   R   0x00400394
+     create_copy_done   Text   R   0x0040021c
+             curr_dir   Data   R   0x100033a0
+            move_east   Text   R   0x0040073c
+            move_west   Text   R   0x0040080c
+            follow_up   Text   R   0x00400874
+       write_pos_done   Text   R   0x00400328
+         follow_north   Text   R   0x00400900
+                step1   Text   R   0x004009a0
+                step2   Text   R   0x004009a4
+                step3   Text   R   0x004009fc
+         for_loop_end   Text   R   0x004003e0
+                step4   Text   R   0x00400a84
+                step5   Text   R   0x00400a8c
+                step6   Text   R   0x00400ae4
+         get_pos_done   Text   R   0x004002a8
+              look_up   Text   R   0x00400468
+     check_turn_count   Text   R   0x00400a58
+         follow_south   Text   R   0x00400918
+       algorithm_done   Text   R   0x00400b3c
+            backtrace   Text   R   0x0040055c
+                space   Data   R   0x10004d84
+            backtrack   Text   R   0x00400a7c
+           move_north   Text   R   0x004006d4
+         print_s_done   Text   R   0x00400b24
+       copy_loop_done   Text   R   0x0040021c
+      find_start_done   Text   R   0x004003ec
+     leave_crumb_east   Text   R   0x00400764
+     leave_crumb_west   Text   R   0x00400834
+            move_once   Text   R   0x00400660
+           move_south   Text   R   0x004007a4
+            look_down   Text   R   0x004004a0
+           look_ahead   Text   R   0x00400404
+           look_right   Text   R   0x004004bc
+       move_once_done   Text   R   0x004006bc
+       backtrack_east   Text   R   0x004005d4
+       backtrack_west   Text   R   0x0040061c
+       follow_up_done   Text   R   0x00400948
+                 DOWN          A   0x00000002
+            end_found   Data   R   0x10004d79
+                 else   Text   R   0x00400a54
+            look_left   Text   R   0x00400484
+       turn_clockwise   Text   R   0x004004fc
+            error_msg   Data   R   0x10004d48
+           find_start   Text   R   0x00400340
+         scratch_maze   Data   R   0x100033a8
+           error_exit   Text   R   0x00400b28
+            write_pos   Text   R   0x004002c0
+
+Module:  r2k_startup.obj
+ Text segment:  36 bytes, load point 0x00400b68
+ Symbols:
+                 Name Section Mode    Value
+            SYS_EXIT2          A   0x00000011
+       __r2k__entry__   Text   RG  0x00400b6c

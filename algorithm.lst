@@ -1,0 +1,1011 @@
+   1 0000               # File:     maze.asm
+   2 0000               # Author:   J. Lo <jcl5201>
+   3 0000               # 
+   4 0000               # Description:  algorithm to run, solve the maze and prints out the solution
+   5 0000               #
+   6 0000               
+   7 0000               # Direction Contants
+   8 0000               UP =    0
+   9 0000               RIGHT = 1 
+  10 0000               DOWN =  2
+  11 0000               LEFT =  3
+  12 0000               
+  13 0000                       .data
+  14 0000                       .align  2
+  15 0000               # Mouse entity
+  16 0000               # store x position
+  17 0000               curr_x:
+  18 0000 00000000	        .word   0
+  19 0004               # store y position
+  20 0004               curr_y:
+  21 0004 00000000	        .word   0
+  22 0008               # store direction
+  23 0008               curr_dir:
+  24 0008 00000000	        .word   UP
+  25 000c               
+  26 000c               # count for turning
+  27 000c               turn_count:
+  28 000c 00000000	        .word   0
+  29 0010               
+  30 0010               # scratch maze for comparing
+  31 0010               scratch_maze:
+  32 0010 00000000	        .space  80*82
+          00000000
+          00000000
+          00000000
+          00000000
+          00000000
+  33 19b0               
+  34 19b0               # ASCII constants
+  35 19b0               error_msg:
+  36 19b0 4572726F	        .asciiz "Error, unknown character found. Aborting solver\n"
+          722C2075
+          6E6B6E6F
+          776E2063
+          68617261
+          63746572
+  37 19e1               end_found:
+  38 19e1 436F6D70	        .asciiz "Completed\n"
+          6C657465
+          640A00  
+  39 19ec               space:
+  40 19ec 2000    	        .asciiz " " 
+  41 19ee               
+  42 0000                       .text
+  43 0000                       .align  2
+  44 0000                       .globl  max_height
+  45 0000                       .globl  max_width
+  46 0000                       .globl  maze_array
+  47 0000                       .globl  print_int
+  48 0000                       .globl  print_string
+  49 0000                       .globl  algorithm
+  50 0000                       .globl  newline
+  51 0000               
+  52 0000               
+  53 0000               #############################################################################
+  54 0000               #       HELPER FUNCTIONS
+  55 0000               #############################################################################
+  56 0000               
+  57 0000               #############################################################################
+  58 0000               # Name:         create_copy
+  59 0000               # Description   creates a copy of the original maze
+  60 0000               # Arguments:    none
+  61 0000               # Returns:      none
+  62 0000               #
+  63 0000               create_copy:
+  64 0000 23BDFFE8	        addi    $sp, $sp, -24
+  65 0004 AFBF0000	        sw      $ra, 0($sp)
+  66 0008 AFB00004	        sw      $s0, 4($sp)
+  67 000c AFB10008	        sw      $s1, 8($sp)
+  68 0010 AFB2000C	        sw      $s2, 12($sp)
+  69 0014 AFB30010	        sw      $s3, 16($sp)
+  70 0018 AFB40014	        sw      $s4, 20($sp)
+  71 001c                       
+  72 001c 3C100000	        la      $s0, max_height
+     0020 36100000
+  73 0024 3C110000	        la      $s1, max_width
+     0028 36310000
+  74 002c 8E100000	        lw      $s0, 0($s0)
+  75 0030 8E310000	        lw      $s1, 0($s1)
+  76 0034 22310002	        addi    $s1, 2
+  77 0038 02110018	        mul     $s0, $s0, $s1           # get total length to loop through
+     003c 00008012
+  78 0040               
+  79 0040 3C110000	        la      $s1, maze_array
+     0044 36310000
+  80 0048 3C120000	        la      $s2, scratch_maze       # get the arrays
+     004c 36520000
+  81 0050 00004021	        move    $t0, $zero              # set counter
+  82 0054               copy_loop:
+  83 0054 11100006	        beq     $t0, $s0, copy_loop_done
+  84 0058 82330000	        lb      $s3, 0($s1)
+  85 005c A2530000	        sb      $s3, 0($s2)             # load and store it into a copy
+  86 0060                       
+  87 0060               copy_loop_end:
+  88 0060 21080001	        addi    $t0, 1
+  89 0064 22310001	        addi    $s1, $s1, 1
+  90 0068 22520001	        addi    $s2, $s2, 1             # increm all counts and ptrs
+  91 006c 08000015	        j       copy_loop
+  92 0070               
+  93 0070               copy_loop_done:
+  94 0070               create_copy_done:
+  95 0070 8FBF0000	        lw      $ra, 0($sp)
+  96 0074 8FB00004	        lw      $s0, 4($sp)
+  97 0078 8FB10008	        lw      $s1, 8($sp)
+  98 007c 8FB2000C	        lw      $s2, 12($sp)
+  99 0080 8FB30010	        lw      $s3, 16($sp)
+ 100 0084 8FB40014	        lw      $s4, 20($sp)
+ 101 0088 23BD0018	        addi    $sp, $sp, 24
+ 102 008c               
+ 103 008c 03E00008	        jr      $ra
+ 104 0090               
+ 105 0090               #############################################################################
+ 106 0090               # Name:         get_pos
+ 107 0090               # Description:  get the char (int) value at the specific board
+ 108 0090               # Arguments:    $a0     x pos, width
+ 109 0090               #               $a1     y pos, height
+ 110 0090               #               $a2     addr of array
+ 111 0090               # Returns:      $v0     int representation of the value returned
+ 112 0090               #                       returns 0 if failed
+ 113 0090               #                       
+ 114 0090               get_pos:
+ 115 0090 23BDFFF0	        addi    $sp, $sp, -16
+ 116 0094 AFBF0000	        sw      $ra, 0($sp)
+ 117 0098 AFB00004	        sw      $s0, 4($sp)
+ 118 009c AFB10008	        sw      $s1, 8($sp)
+ 119 00a0 AFB2000C	        sw      $s2, 12($sp)
+ 120 00a4                       
+ 121 00a4 00C09021	        move    $s2, $a2
+ 122 00a8 34020000	        li      $v0, 0                          # set up return
+ 123 00ac               
+ 124 00ac 3C100000	        la      $s0, max_height
+     00b0 36100000
+ 125 00b4 8E100000	        lw      $s0, 0($s0)                     # get actual height             
+ 126 00b8 00A0082A	        blt     $a1, $zero, get_pos_done
+     00bc 1420000F
+ 127 00c0 00B0082A	        bge     $a1, $s0, get_pos_done          # check for valid length
+     00c4 1020000D
+ 128 00c8                       
+ 129 00c8 3C100000	        la      $s0, max_width
+     00cc 36100000
+ 130 00d0 8E100000	        lw      $s0, 0($s0)             
+ 131 00d4 0080082A	        blt     $a0, $zero, get_pos_done
+     00d8 14200008
+ 132 00dc 0090082A	        bge     $a0, $s0, get_pos_done          # check for valid width
+     00e0 10200006
+ 133 00e4 22100002	        addi    $s0, 2
+ 134 00e8               
+ 135 00e8 00B00018	        mul     $s1, $a1, $s0
+     00ec 00008812
+ 136 00f0 02248820	        add     $s1, $s1, $a0
+ 137 00f4 02519020	        add     $s2, $s2, $s1                   # math to get to position in
+ 138 00f8                                                               # array
+ 139 00f8               
+ 140 00f8 82420000	        lb      $v0, 0($s2)                     # get value at position
+ 141 00fc               get_pos_done:
+ 142 00fc 8FBF0000	        lw      $ra, 0($sp)
+ 143 0100 8FB00004	        lw      $s0, 4($sp)
+ 144 0104 8FB10008	        lw      $s1, 8($sp)
+ 145 0108 8FB2000C	        lw      $s2, 12($sp)
+ 146 010c 23BD0010	        addi    $sp, $sp, 16
+ 147 0110               
+ 148 0110 03E00008	        jr      $ra
+ 149 0114               
+ 150 0114               #############################################################################
+ 151 0114               # Name:         write_pos
+ 152 0114               # Description:  write a given character to the position
+ 153 0114               # Arguments:    $a0     x pos, width
+ 154 0114               #               $a1     y pos, height
+ 155 0114               #               $a2     ascii int value to insert
+ 156 0114               #               $a3     addr of array to go into
+ 157 0114               # Returns:      none
+ 158 0114               write_pos:
+ 159 0114 23BDFFF0	        addi    $sp, $sp, -16
+ 160 0118 AFBF0000	        sw      $ra, 0($sp)
+ 161 011c AFB00004	        sw      $s0, 4($sp)
+ 162 0120 AFB10008	        sw      $s1, 8($sp)
+ 163 0124 AFB2000C	        sw      $s2, 12($sp)
+ 164 0128                       
+ 165 0128 00E09021	        move    $s2, $a3
+ 166 012c 3C100000	        la      $s0, max_height
+     0130 36100000
+ 167 0134 8E100000	        lw      $s0, 0($s0)             
+ 168 0138 00A0082A	        blt     $a1, $zero, write_pos_done
+     013c 1420000F
+ 169 0140 00B0082A	        bge     $a1, $s0, write_pos_done        # check for valid length
+     0144 1020000D
+ 170 0148                       
+ 171 0148 3C100000	        la      $s0, max_width
+     014c 36100000
+ 172 0150 8E100000	        lw      $s0, 0($s0)             
+ 173 0154 0080082A	        blt     $a0, $zero, write_pos_done
+     0158 14200008
+ 174 015c 0090082A	        bge     $a0, $s0, write_pos_done        # check for valid width
+     0160 10200006
+ 175 0164 22100002	        addi    $s0, 2
+ 176 0168                       # does not alter newline or print statements
+ 177 0168                      
+ 178 0168 00B00018	        mul     $s1, $a1, $s0
+     016c 00008812
+ 179 0170 02248820	        add     $s1, $s1, $a0
+ 180 0174 02519020	        add     $s2, $s2, $s1                   # math to get to pos
+ 181 0178               
+ 182 0178 A2460000	        sb      $a2, 0($s2)                     # store into the array
+ 183 017c               
+ 184 017c               write_pos_done:
+ 185 017c 8FBF0000	        lw      $ra, 0($sp)
+ 186 0180 8FB00004	        lw      $s0, 4($sp)
+ 187 0184 8FB10008	        lw      $s1, 8($sp)
+ 188 0188 8FB2000C	        lw      $s2, 12($sp)
+ 189 018c 23BD0010	        addi    $sp, $sp, 16
+ 190 0190               
+ 191 0190 03E00008	        jr      $ra
+ 192 0194               
+ 193 0194               #############################################################################
+ 194 0194               # Name:         find_start
+ 195 0194               # Description:  does byte by byte checking to see where the starting position
+ 196 0194               #               is located at
+ 197 0194               # Arguments:    none
+ 198 0194               # Returns:      none
+ 199 0194               find_start:
+ 200 0194 23BDFFF0	        addi    $sp, $sp, -16
+ 201 0198 AFBF0000	        sw      $ra, 0($sp)
+ 202 019c AFB00004	        sw      $s0, 4($sp)
+ 203 01a0 AFB10008	        sw      $s1, 8($sp)
+ 204 01a4 AFB2000C	        sw      $s2, 12($sp)
+ 205 01a8                       
+ 206 01a8 3C100000	        la      $s0, max_height
+     01ac 36100000
+ 207 01b0 8E100000	        lw      $s0, 0($s0)
+ 208 01b4 3C110000	        la      $s1, max_width
+     01b8 36310000
+ 209 01bc 8E310000	        lw      $s1, 0($s1)
+ 210 01c0 22310002	        addi    $s1, $s1, 2             # get shifted width
+ 211 01c4               
+ 212 01c4 02110018	        mul     $t0, $s0, $s1           # get total chars
+     01c8 00004012
+ 213 01cc               
+ 214 01cc 3C100000	        la      $s0, maze_array
+     01d0 36100000
+ 215 01d4 34090000	        li      $t1, 0                  # set up counter 
+ 216 01d8 340A0053	        li      $t2, 83                 # ASCII value for S
+ 217 01dc               for_loop:
+ 218 01dc 820B0000	        lb      $t3, 0($s0)
+ 219 01e0 116A0001	        beq     $t3, $t2, found  
+ 220 01e4 0800008D	        j       for_loop_end
+ 221 01e8               found: 
+ 222 01e8 3C110000	        la      $s1, max_width
+     01ec 36310000
+ 223 01f0 8E310000	        lw      $s1, 0($s1)
+ 224 01f4 22310002	        addi    $s1, 2
+ 225 01f8 0131001A	        rem     $s2, $t1, $s1           # math to find X position
+     01fc 00009010
+ 226 0200                       
+ 227 0200 3C110000	        la      $s1, curr_x
+     0204 36310000
+ 228 0208 AE320000	        sw      $s2, 0($s1)             # store value
+ 229 020c               
+ 230 020c 3C110000	        la      $s1, max_width
+     0210 36310000
+ 231 0214 8E310000	        lw      $s1, 0($s1)
+ 232 0218 22310002	        addi    $s1, 2 
+ 233 021c 0131001A	        div     $s2, $t1, $s1           # math to find Y position
+     0220 00009012
+ 234 0224                       
+ 235 0224 3C110000	        la      $s1, curr_y
+     0228 36310000
+ 236 022c AE320000	        sw      $s2, 0($s1)             # store value
+ 237 0230                       
+ 238 0230 08000090	        j       for_loop_done
+ 239 0234               for_loop_end:
+ 240 0234 22100001	        addi    $s0, $s0, 1
+ 241 0238 21290001	        addi    $t1, $t1, 1             # increment ptr and count
+ 242 023c 08000077	        j       for_loop
+ 243 0240               for_loop_done:
+ 244 0240               find_start_done:
+ 245 0240 8FBF0000	        lw      $ra, 0($sp)
+ 246 0244 8FB00004	        lw      $s0, 4($sp)
+ 247 0248 8FB10008	        lw      $s1, 8($sp)
+ 248 024c 8FB2000C	        lw      $s2, 12($sp)
+ 249 0250 23BD0010	        addi    $sp, $sp, 16
+ 250 0254 03E00008	        jr      $ra
+ 251 0258               
+ 252 0258               #############################################################################
+ 253 0258               # Name:         look_ahead
+ 254 0258               # Description:  look ahead one square for current direction
+ 255 0258               # Arguments:    $a0     addr of maze to look at
+ 256 0258               # Returns:      $v0     return char at the next square
+ 257 0258               #                       returns -1 on incomplete
+ 258 0258               look_ahead:
+ 259 0258 23BDFFE8	        addi    $sp, $sp, -24
+ 260 025c AFBF0000	        sw      $ra, 0($sp)
+ 261 0260 AFB00004	        sw      $s0, 4($sp)
+ 262 0264 AFB10008	        sw      $s1, 8($sp)
+ 263 0268 AFB2000C	        sw      $s2, 12($sp)
+ 264 026c AFB30010	        sw      $s3, 16($sp)
+ 265 0270 AFB40014	        sw      $s4, 20($sp)
+ 266 0274                       
+ 267 0274 00809821	        move    $s3, $a0
+ 268 0278 3C100000	        la      $s0, curr_x
+     027c 36100000
+ 269 0280 8E100000	        lw      $s0, 0($s0)
+ 270 0284 3C110000	        la      $s1, curr_y
+     0288 36310000
+ 271 028c 8E310000	        lw      $s1, 0($s1)
+ 272 0290 3C120000	        la      $s2, curr_dir
+     0294 36520000
+ 273 0298 8E520000	        lw      $s2, 0($s2)             # get mouse attributes
+ 274 029c                       
+ 275 029c 2402FFFF	        li      $v0, -1
+ 276 02a0               
+ 277 02a0 34080000	        li      $t0, UP
+ 278 02a4 11120005	        beq     $t0, $s2, look_up
+ 279 02a8 34080003	        li      $t0, LEFT
+ 280 02ac 1112000A	        beq     $t0, $s2, look_left
+ 281 02b0 34080002	        li      $t0, DOWN
+ 282 02b4 1112000F	        beq     $t0, $s2, look_down
+ 283 02b8 080000C4	        j       look_right              # check which direction mouse is
+ 284 02bc                                                       # looking at.
+ 285 02bc               
+ 286 02bc               look_up:
+ 287 02bc 02002021	        move    $a0, $s0
+ 288 02c0 02202821	        move    $a1, $s1
+ 289 02c4 20A5FFFF	        addi    $a1, -1                 
+ 290 02c8 02603021	        move    $a2, $s3
+ 291 02cc 0C000024	        jal     get_pos
+ 292 02d0 0040A021	        move    $s4, $v0
+ 293 02d4               
+ 294 02d4 080000CB	        j       look_ahead_done
+ 295 02d8               
+ 296 02d8               look_left:
+ 297 02d8 02002021	        move    $a0, $s0
+ 298 02dc 2084FFFF	        addi    $a0, -1
+ 299 02e0 02202821	        move    $a1, $s1
+ 300 02e4 02603021	        move    $a2, $s3
+ 301 02e8 0C000024	        jal     get_pos
+ 302 02ec 0040A021	        move    $s4, $v0
+ 303 02f0                       
+ 304 02f0 080000CB	        j       look_ahead_done
+ 305 02f4               
+ 306 02f4               look_down:
+ 307 02f4 02002021	        move    $a0, $s0
+ 308 02f8 02202821	        move    $a1, $s1
+ 309 02fc 20A50001	        addi    $a1, 1
+ 310 0300 02603021	        move    $a2, $s3
+ 311 0304 0C000024	        jal     get_pos
+ 312 0308 0040A021	        move    $s4, $v0
+ 313 030c                       
+ 314 030c 080000CB	        j       look_ahead_done
+ 315 0310               
+ 316 0310               look_right:
+ 317 0310 02002021	        move    $a0, $s0
+ 318 0314 20840001	        addi    $a0, 1
+ 319 0318 02202821	        move    $a1, $s1
+ 320 031c 02603021	        move    $a2, $s3
+ 321 0320 0C000024	        jal     get_pos
+ 322 0324 0040A021	        move    $s4, $v0
+ 323 0328                       
+ 324 0328 080000CB	        j       look_ahead_done
+ 325 032c               
+ 326 032c               look_ahead_done:
+ 327 032c 02801021	        move    $v0, $s4                # at this point, there return
+ 328 0330                                                       # should hold a value
+ 329 0330                       
+ 330 0330 8FBF0000	        lw      $ra, 0($sp)
+ 331 0334 8FB00004	        lw      $s0, 4($sp)
+ 332 0338 8FB10008	        lw      $s1, 8($sp)
+ 333 033c 8FB2000C	        lw      $s2, 12($sp)
+ 334 0340 8FB30010	        lw      $s3, 16($sp)
+ 335 0344 8FB40014	        lw      $s4, 20($sp)
+ 336 0348 23BD0018	        addi    $sp, $sp, 24
+ 337 034c 03E00008	        jr      $ra  
+ 338 0350               
+ 339 0350               #############################################################################
+ 340 0350               # Name:         turn_clockwise
+ 341 0350               # Description:  turn clockwise
+ 342 0350               # Arguments:    none
+ 343 0350               # Returns:      none
+ 344 0350               turn_clockwise:
+ 345 0350 23BDFFF0	        addi    $sp, $sp, -16
+ 346 0354 AFBF0000	        sw      $ra, 0($sp)
+ 347 0358 AFB00004	        sw      $s0, 4($sp)
+ 348 035c AFB10008	        sw      $s1, 8($sp)
+ 349 0360 AFB2000C	        sw      $s2, 12($sp)
+ 350 0364                       
+ 351 0364 3C100000	        la      $s0, curr_dir
+     0368 36100000
+ 352 036c 8E110000	        lw      $s1, 0($s0)
+ 353 0370 22310001	        addi    $s1, $s1, 1             # turn counter clockwise and saved
+ 354 0374 34010004	        rem     $s1, $s1, 4
+     0378 0221001A
+     037c 00008810
+ 355 0380 AE110000	        sw      $s1, 0($s0)
+ 356 0384 3C100000	        la      $s0, turn_count
+     0388 36100000
+ 357 038c 8E110000	        lw      $s1, 0($s0)
+ 358 0390 22310001	        addi    $s1, $s1, 1
+ 359 0394 AE110000	        sw      $s1, 0($s0)
+ 360 0398               
+ 361 0398               turn_clockwise_done:
+ 362 0398 8FBF0000	        lw      $ra, 0($sp)
+ 363 039c 8FB00004	        lw      $s0, 4($sp)
+ 364 03a0 8FB10008	        lw      $s1, 8($sp)
+ 365 03a4 8FB2000C	        lw      $s2, 12($sp)
+ 366 03a8 23BD0010	        addi    $sp, $sp, 16
+ 367 03ac 03E00008	        jr      $ra
+ 368 03b0               
+ 369 03b0               #############################################################################
+ 370 03b0               # Name:         backtrace
+ 371 03b0               # Description:  looks at bread crumb and go back to the previous step
+ 372 03b0               # Arguments:    none
+ 373 03b0               # Returns:      none
+ 374 03b0               backtrace:
+ 375 03b0 23BDFFDC	        addi    $sp, $sp, -36
+ 376 03b4 AFBF0000	        sw      $ra, 0($sp)
+ 377 03b8 AFB00004	        sw      $s0, 4($sp)
+ 378 03bc AFB10008	        sw      $s1, 8($sp)
+ 379 03c0 AFB2000C	        sw      $s2, 12($sp)
+ 380 03c4 AFB30010	        sw      $s3, 16($sp)
+ 381 03c8 AFB40014	        sw      $s4, 20($sp)
+ 382 03cc AFB50018	        sw      $s5, 24($sp)
+ 383 03d0 AFB6001C	        sw      $s6, 28($sp)
+ 384 03d4 AFB70020	        sw      $s7, 32($sp)
+ 385 03d8                       
+ 386 03d8 3C100000	        la      $s0, curr_x
+     03dc 36100000
+ 387 03e0 3C110000	        la      $s1, curr_y
+     03e4 36310000
+ 388 03e8 8E100000	        lw      $s0, 0($s0)
+ 389 03ec 8E310000	        lw      $s1, 0($s1)             # get mouse
+ 390 03f0                       
+ 391 03f0 02002021	        move    $a0, $s0
+ 392 03f4 02202821	        move    $a1, $s1
+ 393 03f8 3C060000	        la      $a2, scratch_maze
+     03fc 34C60000
+ 394 0400 0C000024	        jal     get_pos
+ 395 0404 00409021	        move    $s2, $v0                # gets the bread crumb from scratch board
+ 396 0408               
+ 397 0408 34130065	        li      $s3, 101
+ 398 040c 12530006	        beq     $s2, $s3, backtrack_east
+ 399 0410 3413006E	        li      $s3, 110
+ 400 0414 1253000A	        beq     $s2, $s3, backtrack_north
+ 401 0418 34130073	        li      $s3, 115
+ 402 041c 1253000E	        beq     $s2, $s3, backtrack_south
+ 403 0420 34130077	        li      $s3, 119
+ 404 0424 12530012	        beq     $s2, $s3, backtrack_west
+ 405 0428                                                       # decide which direction to go in
+ 406 0428               backtrack_east:
+ 407 0428 3C100000	        la      $s0, curr_x
+     042c 36100000
+ 408 0430 8E110000	        lw      $s1, 0($s0)
+ 409 0434 22310001	        addi    $s1, $s1, 1
+ 410 0438 AE110000	        sw      $s1, 0($s0)             
+ 411 043c 08000122	        j       backtrace_done
+ 412 0440               backtrack_north:
+ 413 0440 3C100000	        la      $s0, curr_y
+     0444 36100000
+ 414 0448 8E110000	        lw      $s1, 0($s0)
+ 415 044c 2231FFFF	        addi    $s1, $s1, -1
+ 416 0450 AE110000	        sw      $s1, 0($s0)             
+ 417 0454 08000122	        j       backtrace_done
+ 418 0458               backtrack_south:
+ 419 0458 3C100000	        la      $s0, curr_y
+     045c 36100000
+ 420 0460 8E110000	        lw      $s1, 0($s0)
+ 421 0464 22310001	        addi    $s1, $s1, 1
+ 422 0468 AE110000	        sw      $s1, 0($s0)
+ 423 046c 08000122	        j       backtrace_done
+ 424 0470               backtrack_west:
+ 425 0470 3C100000	        la      $s0, curr_x
+     0474 36100000
+ 426 0478 8E110000	        lw      $s1, 0($s0)
+ 427 047c 2231FFFF	        addi    $s1, $s1, -1
+ 428 0480 AE110000	        sw      $s1, 0($s0)
+ 429 0484 08000122	        j       backtrace_done
+ 430 0488               
+ 431 0488               backtrace_done:
+ 432 0488                       # at this point, the mouse has moved exactly one step back
+ 433 0488               
+ 434 0488 8FBF0000	        lw      $ra, 0($sp)
+ 435 048c 8FB00004	        lw      $s0, 4($sp)
+ 436 0490 8FB10008	        lw      $s1, 8($sp)
+ 437 0494 8FB2000C	        lw      $s2, 12($sp)
+ 438 0498 8FB30010	        lw      $s3, 16($sp)
+ 439 049c 8FB40014	        lw      $s4, 20($sp)
+ 440 04a0 8FB50018	        lw      $s5, 24($sp)
+ 441 04a4 8FB6001C	        lw      $s6, 28($sp)
+ 442 04a8 8FB70020	        lw      $s7, 32($sp)
+ 443 04ac 23BD0024	        addi    $sp, $sp, 36
+ 444 04b0 03E00008	        jr      $ra  
+ 445 04b4               
+ 446 04b4               #############################################################################
+ 447 04b4               #       Movement Functions
+ 448 04b4               #############################################################################
+ 449 04b4               # Name:         move_once
+ 450 04b4               # Description:  moves the mouse forward by one dirction, based on its current
+ 451 04b4               #               heading
+ 452 04b4               # Arguments:    none
+ 453 04b4               # Returns:      none
+ 454 04b4               move_once:
+ 455 04b4 23BDFFF0	        addi    $sp, $sp, -16
+ 456 04b8 AFBF0000	        sw      $ra, 0($sp)
+ 457 04bc AFB00004	        sw      $s0, 4($sp)
+ 458 04c0 AFB10008	        sw      $s1, 8($sp)
+ 459 04c4 AFB2000C	        sw      $s2, 12($sp)
+ 460 04c8                       
+ 461 04c8 3C100000	        la      $s0, curr_dir
+     04cc 36100000
+ 462 04d0 8E100000	        lw      $s0, 0($s0)
+ 463 04d4 34110000	        li      $s1, UP
+ 464 04d8 12110005	        beq     $s0, $s1, move_n
+ 465 04dc 34110001	        li      $s1, RIGHT
+ 466 04e0 12110005	        beq     $s0, $s1, move_e
+ 467 04e4 34110003	        li      $s1, LEFT
+ 468 04e8 12110007	        beq     $s0, $s1, move_w
+ 469 04ec 08000140	        j       move_s
+ 470 04f0               move_n:
+ 471 04f0 0C00014A	        jal     move_north
+ 472 04f4 08000144	        j       move_once_done
+ 473 04f8               move_e:
+ 474 04f8 0C000164	        jal     move_east
+ 475 04fc 08000144	        j       move_once_done
+ 476 0500               move_s:
+ 477 0500 0C00017E	        jal     move_south
+ 478 0504 08000144	        j       move_once_done
+ 479 0508               move_w:
+ 480 0508 0C000198	        jal     move_west
+ 481 050c 08000144	        j       move_once_done
+ 482 0510               move_once_done:
+ 483 0510 8FBF0000	        lw      $ra, 0($sp)
+ 484 0514 8FB00004	        lw      $s0, 4($sp)
+ 485 0518 8FB10008	        lw      $s1, 8($sp)
+ 486 051c 8FB2000C	        lw      $s2, 12($sp)
+ 487 0520 23BD0010	        addi    $sp, $sp, 16
+ 488 0524 03E00008	        jr      $ra
+ 489 0528               
+ 490 0528               #############################################################################
+ 491 0528               # Name:         move_DIRECTION
+ 492 0528               # Description:  moves the "mouse" as specified
+ 493 0528               # Arguments:    none
+ 494 0528               # Returns:      none
+ 495 0528               move_north:
+ 496 0528 23BDFFF0	        addi    $sp, $sp, -16
+ 497 052c AFBF0000	        sw      $ra, 0($sp)
+ 498 0530 AFB00004	        sw      $s0, 4($sp)
+ 499 0534 AFB10008	        sw      $s1, 8($sp)
+ 500 0538 AFB2000C	        sw      $s2, 12($sp)
+ 501 053c                       
+ 502 053c 3C100000	        la      $s0, curr_y
+     0540 36100000
+ 503 0544 8E110000	        lw      $s1, 0($s0)
+ 504 0548 2231FFFF	        addi    $s1, $s1, -1
+ 505 054c AE110000	        sw      $s1, 0($s0)             # change the mouse position
+ 506 0550               leave_crumb_north:
+ 507 0550 3C040000	        la      $a0, curr_x
+     0554 34840000
+ 508 0558 8C840000	        lw      $a0, 0($a0)
+ 509 055c 3C050000	        la      $a1, curr_y
+     0560 34A50000
+ 510 0564 8CA50000	        lw      $a1, 0($a1)
+ 511 0568 34060073	        li      $a2, 115
+ 512 056c 3C070000	        la      $a3, scratch_maze
+     0570 34E70000
+ 513 0574 0C000045	        jal     write_pos               # write to that spot in the scratch maze
+ 514 0578                                                       # leaves an ascii character telling
+ 515 0578                                                       # where it was before hand
+ 516 0578 8FBF0000	        lw      $ra, 0($sp)
+ 517 057c 8FB00004	        lw      $s0, 4($sp)
+ 518 0580 8FB10008	        lw      $s1, 8($sp)
+ 519 0584 8FB2000C	        lw      $s2, 12($sp)
+ 520 0588 23BD0010	        addi    $sp, $sp, 16
+ 521 058c 03E00008	        jr      $ra
+ 522 0590               
+ 523 0590               
+ 524 0590               move_east:
+ 525 0590 23BDFFF0	        addi    $sp, $sp, -16
+ 526 0594 AFBF0000	        sw      $ra, 0($sp)
+ 527 0598 AFB00004	        sw      $s0, 4($sp)
+ 528 059c AFB10008	        sw      $s1, 8($sp)
+ 529 05a0 AFB2000C	        sw      $s2, 12($sp)
+ 530 05a4               
+ 531 05a4 3C100000	        la      $s0, curr_x
+     05a8 36100000
+ 532 05ac 8E110000	        lw      $s1, 0($s0)
+ 533 05b0 22310001	        addi    $s1, $s1, 1
+ 534 05b4 AE110000	        sw      $s1, 0($s0)
+ 535 05b8               leave_crumb_east:
+ 536 05b8 3C040000	        la      $a0, curr_x
+     05bc 34840000
+ 537 05c0 8C840000	        lw      $a0, 0($a0)
+ 538 05c4 3C050000	        la      $a1, curr_y
+     05c8 34A50000
+ 539 05cc 8CA50000	        lw      $a1, 0($a1)
+ 540 05d0 34060077	        li      $a2, 119
+ 541 05d4 3C070000	        la      $a3, scratch_maze
+     05d8 34E70000
+ 542 05dc 0C000045	        jal     write_pos               # write to that spot in the scratch maze
+ 543 05e0                                                       # leaves an ascii character telling
+ 544 05e0                                                       # where it was before hand
+ 545 05e0 8FBF0000	        lw      $ra, 0($sp)
+ 546 05e4 8FB00004	        lw      $s0, 4($sp)
+ 547 05e8 8FB10008	        lw      $s1, 8($sp)
+ 548 05ec 8FB2000C	        lw      $s2, 12($sp)
+ 549 05f0 23BD0010	        addi    $sp, $sp, 16
+ 550 05f4 03E00008	        jr      $ra
+ 551 05f8               
+ 552 05f8               move_south:
+ 553 05f8 23BDFFF0	        addi    $sp, $sp, -16
+ 554 05fc AFBF0000	        sw      $ra, 0($sp)
+ 555 0600 AFB00004	        sw      $s0, 4($sp)
+ 556 0604 AFB10008	        sw      $s1, 8($sp)
+ 557 0608 AFB2000C	        sw      $s2, 12($sp)
+ 558 060c                       
+ 559 060c 3C100000	        la      $s0, curr_y
+     0610 36100000
+ 560 0614 8E110000	        lw      $s1, 0($s0)
+ 561 0618 22310001	        addi    $s1, $s1, 1
+ 562 061c AE110000	        sw      $s1, 0($s0)
+ 563 0620               leave_crumb_south:
+ 564 0620 3C040000	        la      $a0, curr_x
+     0624 34840000
+ 565 0628 8C840000	        lw      $a0, 0($a0)
+ 566 062c 3C050000	        la      $a1, curr_y
+     0630 34A50000
+ 567 0634 8CA50000	        lw      $a1, 0($a1)
+ 568 0638 3406006E	        li      $a2, 110
+ 569 063c 3C070000	        la      $a3, scratch_maze
+     0640 34E70000
+ 570 0644 0C000045	        jal     write_pos               # write to that spot in the scratch maze
+ 571 0648                                                       # leaves an ascii character telling
+ 572 0648                                                       # where it was before hand
+ 573 0648 8FBF0000	        lw      $ra, 0($sp)
+ 574 064c 8FB00004	        lw      $s0, 4($sp)
+ 575 0650 8FB10008	        lw      $s1, 8($sp)
+ 576 0654 8FB2000C	        lw      $s2, 12($sp)
+ 577 0658 23BD0010	        addi    $sp, $sp, 16
+ 578 065c 03E00008	        jr      $ra
+ 579 0660               
+ 580 0660               move_west:
+ 581 0660 23BDFFF0	        addi    $sp, $sp, -16
+ 582 0664 AFBF0000	        sw      $ra, 0($sp)
+ 583 0668 AFB00004	        sw      $s0, 4($sp)
+ 584 066c AFB10008	        sw      $s1, 8($sp)
+ 585 0670 AFB2000C	        sw      $s2, 12($sp)
+ 586 0674                       
+ 587 0674 3C100000	        la      $s0, curr_x
+     0678 36100000
+ 588 067c 8E110000	        lw      $s1, 0($s0)
+ 589 0680 2231FFFF	        addi    $s1, $s1, -1
+ 590 0684 AE110000	        sw      $s1, 0($s0)
+ 591 0688               leave_crumb_west:
+ 592 0688 3C040000	        la      $a0, curr_x
+     068c 34840000
+ 593 0690 8C840000	        lw      $a0, 0($a0)
+ 594 0694 3C050000	        la      $a1, curr_y
+     0698 34A50000
+ 595 069c 8CA50000	        lw      $a1, 0($a1)
+ 596 06a0 34060065	        li      $a2, 101
+ 597 06a4 3C070000	        la      $a3, scratch_maze
+     06a8 34E70000
+ 598 06ac 0C000045	        jal     write_pos               # write to that spot in the scratch maze
+ 599 06b0                                                       # leaves an ascii character telling
+ 600 06b0                                                       # where it was before hand
+ 601 06b0 8FBF0000	        lw      $ra, 0($sp)
+ 602 06b4 8FB00004	        lw      $s0, 4($sp)
+ 603 06b8 8FB10008	        lw      $s1, 8($sp)
+ 604 06bc 8FB2000C	        lw      $s2, 12($sp)
+ 605 06c0 23BD0010	        addi    $sp, $sp, 16
+ 606 06c4 03E00008	        jr      $ra
+ 607 06c8               #############################################################################
+ 608 06c8               # Name:         follow_up
+ 609 06c8               # Description:  from the breadcrumbs of scratch board, move the mouse back
+ 610 06c8               #               to start
+ 611 06c8               # Arguments:    none
+ 612 06c8               # Retunrs:      none
+ 613 06c8               follow_up:
+ 614 06c8 23BDFFDC	        addi    $sp, $sp, -36
+ 615 06cc AFBF0000	        sw      $ra, 0($sp)
+ 616 06d0 AFB00004	        sw      $s0, 4($sp)
+ 617 06d4 AFB10008	        sw      $s1, 8($sp)
+ 618 06d8 AFB2000C	        sw      $s2, 12($sp)
+ 619 06dc AFB30010	        sw      $s3, 16($sp)
+ 620 06e0 AFB40014	        sw      $s4, 20($sp)
+ 621 06e4 AFB50018	        sw      $s5, 24($sp)
+ 622 06e8 AFB6001C	        sw      $s6, 28($sp)
+ 623 06ec AFB70020	        sw      $s7, 32($sp)
+ 624 06f0               
+ 625 06f0 3C100000	        la      $s0, curr_x
+     06f4 36100000
+ 626 06f8 3C110000	        la      $s1, curr_y
+     06fc 36310000
+ 627 0700 8E100000	        lw      $s0, 0($s0)
+ 628 0704 8E310000	        lw      $s1, 0($s1)             # get mouse
+ 629 0708               
+ 630 0708 02002021	        move    $a0, $s0
+ 631 070c 02202821	        move    $a1, $s1
+ 632 0710 3C060000	        la      $a2, scratch_maze
+     0714 34C60000
+ 633 0718 0C000024	        jal     get_pos                 # get character at mouse
+ 634 071c               
+ 635 071c 34130065	        li      $s3, 101
+ 636 0720 12530006	        beq     $s2, $s3, follow_east
+ 637 0724 3413006E	        li      $s3, 110
+ 638 0728 1253000A	        beq     $s2, $s3, follow_north
+ 639 072c 34130073	        li      $s3, 115
+ 640 0730 1253000E	        beq     $s2, $s3, follow_south
+ 641 0734 34130077	        li      $s3, 119
+ 642 0738 12530012	        beq     $s2, $s3, follow_west
+ 643 073c                                                       # decide which direction to go in
+ 644 073c               follow_east:
+ 645 073c 3C100000	        la      $s0, curr_x
+     0740 36100000
+ 646 0744 8E110000	        lw      $s1, 0($s0)
+ 647 0748 22310001	        addi    $s1, 1
+ 648 074c AE110000	        sw      $s1, 0($s0)
+ 649 0750 080001E7	        j       follow_up_done
+ 650 0754               follow_north:
+ 651 0754 3C100000	        la      $s0, curr_y
+     0758 36100000
+ 652 075c 8E110000	        lw      $s1, 0($s0)
+ 653 0760 2231FFFF	        addi    $s1, -1
+ 654 0764 AE110000	        sw      $s1, 0($s0)
+ 655 0768 080001E7	        j       follow_up_done
+ 656 076c               follow_south:
+ 657 076c 3C100000	        la      $s0, curr_y
+     0770 36100000
+ 658 0774 8E110000	        lw      $s1, 0($s0)
+ 659 0778 22310001	        addi    $s1, 1
+ 660 077c AE110000	        sw      $s1, 0($s0)
+ 661 0780 080001E7	        j       follow_up_done
+ 662 0784               follow_west:
+ 663 0784 3C100000	        la      $s0, curr_x
+     0788 36100000
+ 664 078c 8E110000	        lw      $s1, 0($s0)
+ 665 0790 2231FFFF	        addi    $s1, -1
+ 666 0794 AE110000	        sw      $s1, 0($s0)
+ 667 0798 080001E7	        j       follow_up_done
+ 668 079c               
+ 669 079c               follow_up_done:
+ 670 079c 8FBF0000	        lw      $ra, 0($sp)
+ 671 07a0 8FB00004	        lw      $s0, 4($sp)
+ 672 07a4 8FB10008	        lw      $s1, 8($sp)
+ 673 07a8 8FB2000C	        lw      $s2, 12($sp)
+ 674 07ac 8FB30010	        lw      $s3, 16($sp)
+ 675 07b0 8FB40014	        lw      $s4, 20($sp)
+ 676 07b4 8FB50018	        lw      $s5, 24($sp)
+ 677 07b8 8FB6001C	        lw      $s6, 28($sp)
+ 678 07bc 8FB70020	        lw      $s7, 32($sp)
+ 679 07c0 23BD0024	        addi    $sp, $sp, 36
+ 680 07c4 03E00008	        jr      $ra  
+ 681 07c8               #############################################################################
+ 682 07c8               #       ALGORITHM
+ 683 07c8               #############################################################################
+ 684 07c8               # Name:         algorithm
+ 685 07c8               # Description:  run the algorithm. this is really op.
+ 686 07c8               # Arguments:    none
+ 687 07c8               # Returns:      none
+ 688 07c8               algorithm:
+ 689 07c8 23BDFFDC	        addi    $sp, $sp, -36
+ 690 07cc AFBF0000	        sw      $ra, 0($sp)
+ 691 07d0 AFB00004	        sw      $s0, 4($sp)
+ 692 07d4 AFB10008	        sw      $s1, 8($sp)
+ 693 07d8 AFB2000C	        sw      $s2, 12($sp)
+ 694 07dc AFB30010	        sw      $s3, 16($sp)
+ 695 07e0 AFB40014	        sw      $s4, 20($sp)
+ 696 07e4 AFB50018	        sw      $s5, 24($sp)
+ 697 07e8 AFB6001C	        sw      $s6, 28($sp)
+ 698 07ec AFB70020	        sw      $s7, 32($sp)
+ 699 07f0 0C000000	        jal     create_copy
+ 700 07f4               
+ 701 07f4               step1:
+ 702 07f4 0C000065	        jal     find_start
+ 703 07f8               step2:
+ 704 07f8 3C100000	        la      $s0, curr_x
+     07fc 36100000
+ 705 0800 8E100000	        lw      $s0, 0($s0)             # get curr x pos
+ 706 0804 3C110000	        la      $s1, curr_y
+     0808 36310000
+ 707 080c 8E310000	        lw      $s1, 0($s1)             # get curr y pos
+ 708 0810                       
+ 709 0810 02002021	        move    $a0, $s0
+ 710 0814 02202821	        move    $a1, $s1
+ 711 0818 3C060000	        la      $a2, maze_array
+     081c 34C60000
+ 712 0820 0C000024	        jal     get_pos                 # get square 
+ 713 0824 00409021	        move    $s2, $v0
+ 714 0828                       
+ 715 0828 3C170000	        la      $s7, turn_count
+     082c 36F70000
+ 716 0830 AEE00000	        sw      $zero, 0($s7)
+ 717 0834               
+ 718 0834 34080045	        li      $t0, 69
+ 719 0838 12480029	        beq     $s2, $t0, step5         # check if square is 'E'
+ 720 083c 34080020	        li      $t0, 32
+ 721 0840 12480003	        beq     $s2, $t0, step3         # check if square is ' '
+ 722 0844 34080053	        li      $t0, 83
+ 723 0848 12480001	        beq     $s2, $t0, step3         # check is square is 'S'
+ 724 084c 0800025F	        j       error_exit
+ 725 0850               step3:    
+ 726 0850 3C040000	        la      $a0, maze_array
+     0854 34840000
+ 727 0858 0C000096	        jal     look_ahead
+ 728 085c                       
+ 729 085c 00409821	        move    $s3, $v0
+ 730 0860 34190020	        li      $t9, 32
+ 731 0864 12790003	        beq     $s3, $t9, step3_cond    # check for space in main board
+ 732 0868 34190045	        li      $t9, 69
+ 733 086c 1279001A	        beq     $s3, $t9, step4
+ 734 0870 0800022A	        j       else
+ 735 0874               step3_cond:
+ 736 0874 3C040000	        la      $a0, scratch_maze
+     0878 34840000
+ 737 087c 0C000096	        jal     look_ahead
+ 738 0880 00409821	        move    $s3, $v0                # look at next square
+ 739 0884               
+ 740 0884 34190065	        li      $t9, 101                 
+ 741 0888 12790007	        beq     $s3, $t9, else         
+ 742 088c 3419006E	        li      $t9, 110
+ 743 0890 12790005	        beq     $s3, $t9, else
+ 744 0894 34190073	        li      $t9, 115
+ 745 0898 12790003	        beq     $s3, $t9, else
+ 746 089c 34190077	        li      $t9, 119
+ 747 08a0 12790001	        beq     $s3, $t9, else          # check for breadcrumbs
+ 748 08a4 08000236	        j       step4
+ 749 08a8               else:
+ 750 08a8 0C0000D4	        jal     turn_clockwise
+ 751 08ac               check_turn_count:
+ 752 08ac 3C140000	        la      $s4, turn_count
+     08b0 36940000
+ 753 08b4 8E940000	        lw      $s4, 0($s4)
+ 754 08b8 34190004	        li      $t9, 4
+ 755 08bc 12990001	        beq     $s4, $t9, turn_max      # check if turned max times already
+ 756 08c0 08000214	        j       step3
+ 757 08c4               
+ 758 08c4               turn_max:
+ 759 08c4 3C140000	        la      $s4, turn_count
+     08c8 36940000
+ 760 08cc AE800000	        sw      $zero, 0($s4)           # reset turn count and backtrack
+ 761 08d0               backtrack:
+ 762 08d0 0C0000EC	        jal     backtrace
+ 763 08d4 08000214	        j       step3 
+ 764 08d8               step4:
+ 765 08d8 0C00012D	        jal     move_once
+ 766 08dc 080001FE	        j       step2
+ 767 08e0               step5:   
+ 768 08e0 0C0000EC	        jal     backtrace               # back track one step
+ 769 08e4               
+ 770 08e4 3C100000	        la      $s0, curr_x
+     08e8 36100000
+ 771 08ec 3C110000	        la      $s1, curr_y
+     08f0 36310000
+ 772 08f4 8E100000	        lw      $s0, 0($s0)
+ 773 08f8 8E310000	        lw      $s1, 0($s1)
+ 774 08fc 3C060000	        la      $a2, maze_array         # load mous and stuff
+     0900 34C60000
+ 775 0904               
+ 776 0904 02002021	        move    $a0, $s0
+ 777 0908 02202821	        move    $a1, $s1
+ 778 090c 0C000024	        jal     get_pos
+ 779 0910 00409021	        move    $s2, $v0                # get char at position
+ 780 0914               
+ 781 0914 34150053	        li      $s5, 83
+ 782 0918 12550007	        beq     $s2, $s5, step6         # if reached the start, done reading
+ 783 091c                                                       # bread crumbs.        
+ 784 091c 02002021	        move    $a0, $s0                
+ 785 0920 02202821	        move    $a1, $s1
+ 786 0924 3406002E	        li      $a2, 46
+ 787 0928 3C070000	        la      $a3, maze_array
+     092c 34E70000
+ 788 0930 0C000045	        jal     write_pos               # if not, leave a physical crumb
+ 789 0934               
+ 790 0934 08000238	        j       step5
+ 791 0938               step6:
+ 792 0938                       # done with reading, solving, writing.
+ 793 0938               print_solution:
+ 794 0938 3C100000	        la      $s0, max_height
+     093c 36100000
+ 795 0940 3C110000	        la      $s1, max_width
+     0944 36310000
+ 796 0948 8E100000	        lw      $s0, 0($s0)
+ 797 094c 8E310000	        lw      $s1, 0($s1)
+ 798 0950 22310002	        addi    $s1, 2
+ 799 0954 3C120000	        la      $s2, maze_array
+     0958 36520000
+ 800 095c               
+ 801 095c 34130000	        li      $s3, 0                  # count
+ 802 0960               print_s_loop:
+ 803 0960 12700005	        beq     $s3, $s0, print_s_done
+ 804 0964                       
+ 805 0964 02402021	        move    $a0, $s2
+ 806 0968 0C000000	        jal     print_string            # print the line of the maze, ends with
+ 807 096c                                                       # null        
+ 808 096c 22730001	        addi    $s3, 1
+ 809 0970 02519020	        add     $s2, $s1                # shift ptrs and add count
+ 810 0974               
+ 811 0974 08000258	        j       print_s_loop
+ 812 0978               print_s_done:
+ 813 0978 08000264	        j       algorithm_done          # done completely
+ 814 097c               error_exit:
+ 815 097c 3C040000	        la      $a0, error_msg
+     0980 34840000
+ 816 0984 0C000000	        jal     print_string
+ 817 0988 3402000A	        li      $v0, 10
+ 818 098c 0000000C	        syscall                         # error message ready to be sued
+ 819 0990               algorithm_done:
+ 820 0990 8FBF0000	        lw      $ra, 0($sp)
+ 821 0994 8FB00004	        lw      $s0, 4($sp)
+ 822 0998 8FB10008	        lw      $s1, 8($sp)
+ 823 099c 8FB2000C	        lw      $s2, 12($sp)
+ 824 09a0 8FB30010	        lw      $s3, 16($sp)
+ 825 09a4 8FB40014	        lw      $s4, 20($sp)
+ 826 09a8 8FB50018	        lw      $s5, 24($sp)
+ 827 09ac 8FB6001C	        lw      $s6, 28($sp)
+ 828 09b0 8FB70020	        lw      $s7, 32($sp)
+ 829 09b4 23BD0024	        addi    $sp, $sp, 36
+ 830 09b8 03E00008	        jr      $ra                     # DONE!
+
+
+DOWN                 = 00000002   
+LEFT                 = 00000003   
+RIGHT                = 00000001   
+UP                   = 00000000   
+algorithm              000007C8 RG text 
+algorithm_done         00000990 R  text 
+backtrace              000003B0 R  text 
+backtrace_done         00000488 R  text 
+backtrack              000008D0 R  text 
+backtrack_east         00000428 R  text 
+backtrack_north        00000440 R  text 
+backtrack_south        00000458 R  text 
+backtrack_west         00000470 R  text 
+check_turn_count       000008AC R  text 
+copy_loop              00000054 R  text 
+copy_loop_done         00000070 R  text 
+copy_loop_end          00000060 R  text 
+create_copy            00000000 R  text 
+create_copy_done       00000070 R  text 
+curr_dir               00000008 R  data 
+curr_x                 00000000 R  data 
+curr_y                 00000004 R  data 
+else                   000008A8 R  text 
+end_found              000019E1 R  data 
+error_exit             0000097C R  text 
+error_msg              000019B0 R  data 
+find_start             00000194 R  text 
+find_start_done        00000240 R  text 
+follow_east            0000073C R  text 
+follow_north           00000754 R  text 
+follow_south           0000076C R  text 
+follow_up              000006C8 R  text 
+follow_up_done         0000079C R  text 
+follow_west            00000784 R  text 
+for_loop               000001DC R  text 
+for_loop_done          00000240 R  text 
+for_loop_end           00000234 R  text 
+found                  000001E8 R  text 
+get_pos                00000090 R  text 
+get_pos_done           000000FC R  text 
+leave_crumb_east       000005B8 R  text 
+leave_crumb_north      00000550 R  text 
+leave_crumb_south      00000620 R  text 
+leave_crumb_west       00000688 R  text 
+look_ahead             00000258 R  text 
+look_ahead_done        0000032C R  text 
+look_down              000002F4 R  text 
+look_left              000002D8 R  text 
+look_right             00000310 R  text 
+look_up                000002BC R  text 
+max_height             ******** XG
+max_width              ******** XG
+maze_array             ******** XG
+move_e                 000004F8 R  text 
+move_east              00000590 R  text 
+move_n                 000004F0 R  text 
+move_north             00000528 R  text 
+move_once              000004B4 R  text 
+move_once_done         00000510 R  text 
+move_s                 00000500 R  text 
+move_south             000005F8 R  text 
+move_w                 00000508 R  text 
+move_west              00000660 R  text 
+newline                ******** XG
+print_int              ******** XG
+print_s_done           00000978 R  text 
+print_s_loop           00000960 R  text 
+print_solution         00000938 R  text 
+print_string           ******** XG
+scratch_maze           00000010 R  data 
+space                  000019EC R  data 
+step1                  000007F4 R  text 
+step2                  000007F8 R  text 
+step3                  00000850 R  text 
+step3_cond             00000874 R  text 
+step4                  000008D8 R  text 
+step5                  000008E0 R  text 
+step6                  00000938 R  text 
+turn_clockwise         00000350 R  text 
+turn_clockwise_done    00000398 R  text 
+turn_count             0000000C R  data 
+turn_max               000008C4 R  text 
+write_pos              00000114 R  text 
+write_pos_done         0000017C R  text 

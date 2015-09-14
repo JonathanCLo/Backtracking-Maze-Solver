@@ -1,0 +1,323 @@
+   1 0000               # File:     maze.asm
+   2 0000               # Author:   J. Lo <jcl5201>
+   3 0000               # 
+   4 0000               # Description:  This program reads a list of numbers from stdin and creates
+   5 0000               #               a maze
+   6 0000               #
+   7 0000               
+   8 0000               # CONSTANTS
+   9 0000               #
+  10 0000               # syscalls
+  11 0000               PRINT_INT =     1
+  12 0000               PRINT_STRING =  4
+  13 0000               READ_INT =      5
+  14 0000               READ_STRING =   8
+  15 0000               EXIT =          10
+  16 0000               
+  17 0000               # space allocations
+  18 0000                       .data
+  19 0000                       .align  2
+  20 0000               max_height:
+  21 0000 00000000	        .word   0
+  22 0004               max_width:
+  23 0004 00000000	        .word   0
+  24 0008               maze_array:
+  25 0008 00000000	        .space  80*82
+          00000000
+          00000000
+          00000000
+          00000000
+          00000000
+  26 19a8                       .align  2
+  27 19a8               str_buffer:
+  28 19a8 00000000	        .space  80*82        
+          00000000
+          00000000
+          00000000
+          00000000
+          00000000
+  29 3348               
+  30 3348                       # Print constants
+  31 3348                       #
+  32 3348                       .align  2
+  33 3348               banner:
+  34 3348 3D3D3D0A	        .ascii  "===\n"
+  35 334c 3D3D3D20	        .ascii  "=== Maze Solver\n"
+          4D617A65
+          20536F6C
+          7665720A
+  36 335c 3D3D3D20	        .ascii  "=== by\n"
+          62790A  
+  37 3363 3D3D3D20	        .ascii  "=== Jonathan Lo\n"
+          4A6F6E61
+          7468616E
+          204C6F0A
+  38 3373 3D3D3D0A	        .asciiz "===\n"
+          00      
+  39 3378               
+  40 3378               newline:
+  41 3378 0A00    	        .asciiz "\n"
+  42 337a               two_newlines:
+  43 337a 0A0A00  	        .asciiz "\n\n"
+  44 337d               
+  45 337d               input_maze:
+  46 337d 496E7075	        .asciiz "Input Maze:\n\n"
+          74204D61
+          7A653A0A
+          0A00    
+  47 338b               solution_maze:
+  48 338b 536F6C75	        .asciiz "Solution:\n\n"
+          74696F6E
+          3A0A0A00
+  49 3397               
+  50 0000                       .text
+  51 0000                       .align  2
+  52 0000                       .globl  main
+  53 0000                       .globl  max_height
+  54 0000                       .globl  max_width
+  55 0000                       .globl  maze_array
+  56 0000                       .globl  algorithm
+  57 0000                       .globl  print_int
+  58 0000                       .globl  print_string
+  59 0000               
+  60 0000               #############################################################################
+  61 0000               #       MAIN FUNCTION
+  62 0000               #############################################################################
+  63 0000               main:
+  64 0000 23BDFFF4	        addi    $sp, $sp, -12
+  65 0004 AFBF0000	        sw      $ra, 0($sp)
+  66 0008 AFB00004	        sw      $s0, 4($sp)
+  67 000c AFB10008	        sw      $s1, 8($sp)
+  68 0010 AFB2000C	        sw      $s2, 12($sp)
+  69 0014               
+  70 0014               print_banners:
+  71 0014 3C040000	        la      $a0, banner
+     0018 34840000
+  72 001c 0C000041	        jal     print_string            # print the banner strings
+  73 0020                       
+  74 0020 3C040000	        la      $a0, two_newlines
+     0024 34840000
+  75 0028 0C000041	        jal     print_string            # two new lines
+  76 002c               
+  77 002c               read:
+  78 002c 0C000048	        jal     read_inputs             # read all inputs
+  79 0030               
+  80 0030               print_maze:
+  81 0030 3C100000	        la      $s0, max_height
+     0034 36100000
+  82 0038 8E100000	        lw      $s0, 0($s0)             # get actual height of maze
+  83 003c               
+  84 003c 3C110000	        la      $s1, max_width
+     0040 36310000
+  85 0044 8E310000	        lw      $s1, 0($s1)             # get actual width of maze
+  86 0048                       
+  87 0048 22310002	        addi    $s1, 2
+  88 004c 3C120000	        la      $s2, maze_array         # get maze addr
+     0050 36520000
+  89 0054               
+  90 0054 34080000	        li      $t0, 0
+  91 0058               
+  92 0058 3C040000	        la      $a0, input_maze
+     005c 34840000
+  93 0060 0C000041	        jal     print_string            # print input maze prompt
+  94 0064               
+  95 0064               print_input:
+  96 0064 11100005	        beq     $t0, $s0, print_done    # if count == height; break
+  97 0068 02402021	        move    $a0, $s2
+  98 006c 0C000041	        jal     print_string            # print a line of the maze
+  99 0070                       
+ 100 0070 02519020	        add     $s2, $s1
+ 101 0074 21080001	        addi    $t0, 1                  # increment counters and ptr
+ 102 0078               
+ 103 0078 08000019	        j       print_input
+ 104 007c               
+ 105 007c               print_done:
+ 106 007c 3C040000	        la      $a0, two_newlines
+     0080 34840000
+ 107 0084 0C000041	        jal     print_string            # print two new lines
+ 108 0088               
+ 109 0088 3C040000	        la      $a0, solution_maze
+     008c 34840000
+ 110 0090 0C000041	        jal     print_string            # print solution prompt string
+ 111 0094               
+ 112 0094 0C000000	        jal     algorithm               # run to algorithm
+ 113 0098               main_done:
+ 114 0098 8FBF0000	        lw      $ra, 0($sp)
+ 115 009c 8FB00004	        lw      $s0, 4($sp)
+ 116 00a0 8FB10008	        lw      $s1, 8($sp)
+ 117 00a4 8FB2000C	        lw      $s2, 12($sp)
+ 118 00a8 23BD0010	        addi    $sp, $sp, 16
+ 119 00ac               
+ 120 00ac 03E00008	        jr      $ra
+ 121 00b0               
+ 122 00b0               #############################################################################
+ 123 00b0               #       HELPER FUNCTIONS
+ 124 00b0               #############################################################################
+ 125 00b0               
+ 126 00b0               #############################################################################
+ 127 00b0               # Name:         read_int
+ 128 00b0               # Description:  reads and returns an integer from stdin
+ 129 00b0               # Arguments:    None
+ 130 00b0               # Return:       $v0 with the integer read
+ 131 00b0               read_int:
+ 132 00b0 23BDFFFC	        addi    $sp, $sp, -4
+ 133 00b4 AFBF0000	        sw      $ra, 0($sp)
+ 134 00b8                       
+ 135 00b8 34020005	        li      $v0, READ_INT
+ 136 00bc 0000000C	        syscall
+ 137 00c0                       
+ 138 00c0 8FBF0000	        lw      $ra, 0($sp)
+ 139 00c4 23BD0004	        addi    $sp, $sp, 4
+ 140 00c8               
+ 141 00c8 03E00008	        jr      $ra
+ 142 00cc               
+ 143 00cc               #############################################################################
+ 144 00cc               # Name:         read_string
+ 145 00cc               # Description:  reads and returns an string from stdin
+ 146 00cc               # Arguments:    None
+ 147 00cc               # Return:       $v0 with the string read
+ 148 00cc               read_string:
+ 149 00cc 23BDFFFC	        addi    $sp, $sp, -4
+ 150 00d0 AFBF0000	        sw      $ra, 0($sp)
+ 151 00d4                              
+ 152 00d4 34020008	        li      $v0, READ_STRING
+ 153 00d8 0000000C	        syscall
+ 154 00dc                       
+ 155 00dc 8FBF0000	        lw      $ra, 0($sp)
+ 156 00e0 23BD0004	        addi    $sp, $sp, 4
+ 157 00e4               
+ 158 00e4 03E00008	        jr      $ra
+ 159 00e8               
+ 160 00e8               #############################################################################
+ 161 00e8               # Name:         print_int
+ 162 00e8               # Description:  prints out a single integer
+ 163 00e8               # Arguments:    $a0 the number to print
+ 164 00e8               # Retunrs:      None
+ 165 00e8               print_int:
+ 166 00e8 23BDFFFC	        addi    $sp, $sp, -4
+ 167 00ec AFBF0000	        sw      $ra, 0($sp)
+ 168 00f0                       
+ 169 00f0 34020001	        li      $v0, PRINT_INT
+ 170 00f4 0000000C	        syscall
+ 171 00f8                       
+ 172 00f8 8FBF0000	        lw      $ra, 0($sp)
+ 173 00fc 23BD0004	        addi    $sp, $sp, 4
+ 174 0100               
+ 175 0100 03E00008	        jr      $ra
+ 176 0104               
+ 177 0104               #############################################################################
+ 178 0104               # Name:         print_string
+ 179 0104               # Description:  prints out a string
+ 180 0104               # Arguments:    $a0, the string to print
+ 181 0104               # Returns:      Nonw
+ 182 0104               print_string:
+ 183 0104 23BDFFFC	        addi    $sp, $sp, -4
+ 184 0108 AFBF0000	        sw      $ra, 0($sp)
+ 185 010c                       
+ 186 010c 34020004	        li  $v0, PRINT_STRING
+ 187 0110 0000000C	        syscall
+ 188 0114                       
+ 189 0114 8FBF0000	        lw      $ra, 0($sp)
+ 190 0118 23BD0004	        addi    $sp, $sp, 4
+ 191 011c               
+ 192 011c 03E00008	        jr      $ra
+ 193 0120               
+ 194 0120               #############################################################################
+ 195 0120               #   Function Calls
+ 196 0120               #############################################################################
+ 197 0120               
+ 198 0120               #############################################################################
+ 199 0120               # Name:         read_inputs
+ 200 0120               # Description:  read the inputs from stdin and stores them to appropriate
+ 201 0120               #               values
+ 202 0120               # Arguments:    none
+ 203 0120               # Returns:      none
+ 204 0120               #############################################################################
+ 205 0120               read_inputs:
+ 206 0120 23BDFFEC	        addi    $sp, $sp, -20
+ 207 0124 AFBF0000	        sw      $ra, 0($sp)
+ 208 0128 AFB00004	        sw      $s0, 4($sp)
+ 209 012c AFB10008	        sw      $s1, 8($sp)
+ 210 0130 AFB2000C	        sw      $s2, 12($sp)
+ 211 0134 AFB30010	        sw      $s3, 16($sp)
+ 212 0138                       
+ 213 0138 3C100000	        la      $s0, max_height
+     013c 36100000
+ 214 0140 3C110000	        la      $s1, max_width
+     0144 36310000
+ 215 0148 3C120000	        la      $s2, maze_array
+     014c 36520000
+ 216 0150                       
+ 217 0150 0C00002C	        jal     read_int
+ 218 0154 AE020000	        sw      $v0, 0($s0)
+ 219 0158                       
+ 220 0158 0C00002C	        jal     read_int
+ 221 015c AE220000	        sw      $v0, 0($s1)             # reads all int input
+ 222 0160                       
+ 223 0160 8E100000	        lw      $s0, 0($s0)             # get actual height
+ 224 0164 8E310000	        lw      $s1, 0($s1)
+ 225 0168 22310002	        addi    $s1, $s1, 2             # gets actual width
+ 226 016c                       
+ 227 016c               read_array:
+ 228 016c 34090000	        li      $t1, 0                  # sets up count for height         
+ 229 0170               
+ 230 0170               ra_loop:
+ 231 0170                       # loop through lines in input
+ 232 0170 11300007	        beq     $t1, $s0, ra_done
+ 233 0174               
+ 234 0174 02402021	        move    $a0, $s2
+ 235 0178 02202821	        move    $a1, $s1
+ 236 017c 0C000033	        jal     read_string             # reads the line from input and stores
+ 237 0180                                                       # line into maze       
+ 238 0180 02519020	        add     $s2, $s2, $s1           # move pointer of maze_array
+ 239 0184 214A0001	        addi    $t2, $t2, 1
+ 240 0188               
+ 241 0188               ra_loop_end:
+ 242 0188 21290001	        addi    $t1, $t1, 1
+ 243 018c 0800005C	        j       ra_loop
+ 244 0190               
+ 245 0190               ra_done:
+ 246 0190               
+ 247 0190               read_inputs_done:
+ 248 0190 8FBF0000	        lw      $ra, 0($sp)
+ 249 0194 8FB00004	        lw      $s0, 4($sp)
+ 250 0198 8FB10008	        lw      $s1, 8($sp)
+ 251 019c 8FB2000C	        lw      $s2, 12($sp)
+ 252 01a0 8FB30010	        lw      $s3, 16($sp)
+ 253 01a4 23BD0014	        addi    $sp, $sp, 20
+ 254 01a8               
+ 255 01a8 03E00008	        jr      $ra
+
+
+EXIT              = 0000000A   
+PRINT_INT         = 00000001   
+PRINT_STRING      = 00000004   
+READ_INT          = 00000005   
+READ_STRING       = 00000008   
+algorithm           ******** XG
+banner              00003348 R  data 
+input_maze          0000337D R  data 
+main                00000000 RG text 
+main_done           00000098 R  text 
+max_height          00000000 RG data 
+max_width           00000004 RG data 
+maze_array          00000008 RG data 
+newline             00003378 R  data 
+print_banners       00000014 R  text 
+print_done          0000007C R  text 
+print_input         00000064 R  text 
+print_int           000000E8 RG text 
+print_maze          00000030 R  text 
+print_string        00000104 RG text 
+ra_done             00000190 R  text 
+ra_loop             00000170 R  text 
+ra_loop_end         00000188 R  text 
+read                0000002C R  text 
+read_array          0000016C R  text 
+read_inputs         00000120 R  text 
+read_inputs_done    00000190 R  text 
+read_int            000000B0 R  text 
+read_string         000000CC R  text 
+solution_maze       0000338B R  data 
+str_buffer          000019A8 R  data 
+two_newlines        0000337A R  data 
